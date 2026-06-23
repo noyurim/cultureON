@@ -342,12 +342,16 @@ elif 1 <= st.session_state.step <= 10:
         images.append(img_candidates[0] if img_candidates else "https://placehold.co/500x500")
         titles.append(opt['text'])
 
-    clicked = clickable_images(
-        images, titles=titles,
-        div_style={"display": "flex", "justify-content": "center", "gap": "20px"},
-        img_style={"width": "300px", "height": "300px", "object-fit": "cover", "border-radius": "14px"},
-        key=f"img_{st.session_state.step}"
-    )
+   opt_items = list(questions[current_q]['options'].items())
+    images, titles = [], []
+    for val, opt in opt_items:
+        img_candidates = get_question_image(opt['img_keyword'])
+        # HTTP → HTTPS 강제 변환
+        img = img_candidates[0] if img_candidates else "https://placehold.co/500x500"
+        if img.startswith("http://"):
+            img = img.replace("http://", "https://", 1)
+        images.append(img)
+        titles.append(opt['text'])
 
     col1, col2 = st.columns(2)
     with col1:

@@ -11,7 +11,6 @@ from st_clickable_images import clickable_images
 
 st.set_page_config(page_title="문화ON", page_icon="🏛️", layout="centered")
 
-
 def get_culture_day():
     today = date.today()
     year, month = today.year, today.month
@@ -23,7 +22,7 @@ def get_culture_day():
 culture_day = get_culture_day()
 
 # ==========================================
-# 로컬 이미지 → base64 변환 (캐싱)
+# 이미지 로드
 # ==========================================
 @st.cache_data
 def load_question_images():
@@ -39,6 +38,28 @@ def load_question_images():
             except FileNotFoundError:
                 images[key] = "https://placehold.co/500x500"
     return images
+
+@st.cache_data
+def preload_character_images():
+    image_bytes = {}
+    if os.path.exists("characters"):
+        for code in ["0000","0001","0010","0011","0100","0101","0110","0111",
+                     "1000","1001","1010","1011","1100","1101","1110","1111"]:
+            path = f"characters/{code}.png"
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    image_bytes[code] = f.read()
+    return image_bytes
+
+# 세션에 이미지 캐싱 (재로드 방지)
+if 'character_images' not in st.session_state:
+    st.session_state.character_images = preload_character_images()
+if 'question_images' not in st.session_state:
+    st.session_state.question_images = load_question_images()
+
+character_images = st.session_state.character_images
+question_images = st.session_state.question_images
+
 # ==========================================
 # 선호도 컬럼 매핑
 # ==========================================
@@ -113,6 +134,9 @@ def get_sigungu_map():
 sigungu_map = get_sigungu_map()
 sido_list = sorted(sigungu_map.keys())
 
+# ==========================================
+# 군집 정보
+# ==========================================
 cluster_names = {
     0: "정적/학술형 (도서관, 문학)",
     1: "동적/대중문화형 (영화관, 공연)",
@@ -120,6 +144,9 @@ cluster_names = {
 }
 cluster_emoji = {0: "📚", 1: "🎬", 2: "🌿"}
 
+# ==========================================
+# TYPE_TABLE
+# ==========================================
 TYPE_TABLE = {
     "0000": ("🎧 고요한 탐구자",      "혼자 실내에서 가성비 있게, 익숙한 곳을 즐기는 당신",      {"main": [0], "sub": [2]}),
     "0001": ("📚 사색하는 학자",      "혼자 실내에서 가성비 있게, 로컬 명소를 찾는 당신",       {"main": [0], "sub": [2]}),
@@ -139,6 +166,9 @@ TYPE_TABLE = {
     "1111": ("🎉 만능 문화 탐험가",    "함께 야외에서 프리미엄하게, 숨겨진 곳까지 즐기는 당신",   {"main": [1, 2], "sub": [0]}),
 }
 
+# ==========================================
+# 질문 데이터
+# ==========================================
 questions = [
     {"title": "오늘은 누구와?",
      "options": {"0": "혼자서 조용히 🎧", "1": "친구/가족과 함께 🎉"},
@@ -172,20 +202,9 @@ questions = [
      "axis": "B"},
 ]
 
-@st.cache_data
-def preload_character_images():
-    image_bytes = {}
-    if os.path.exists("characters"):
-        for code in TYPE_TABLE.keys():
-            path = f"characters/{code}.png"
-            if os.path.exists(path):
-                with open(path, "rb") as f:
-                    image_bytes[code] = f.read()
-    return image_bytes
-
-character_images = preload_character_images()
-question_images = load_question_images()
-
+# ==========================================
+# 세션 초기화
+# ==========================================
 if 'step' not in st.session_state:
     st.session_state.step = 0
 if 'answers' not in st.session_state:
@@ -193,6 +212,9 @@ if 'answers' not in st.session_state:
 if 'user_info' not in st.session_state:
     st.session_state.user_info = {}
 
+# ==========================================
+# 유틸 함수
+# ==========================================
 def get_culture_type(answers):
     axis_scores = {"A": [], "B": [], "C": [], "D": []}
     for q, a in zip(questions, answers):
@@ -238,10 +260,14 @@ def pick_by_category(pool, n, used_places, used_categories, score_col=None):
             break
     return picked
 
+# ==========================================
+# 화면 렌더링
+# ==========================================
 st.title("🏛️ 문화ON")
 st.caption(f"🗓️ 이번 달 문화의날: {culture_day.month}월 {culture_day.day}일 (수)")
 st.markdown("---")
 
+# ── Step 0 ──────────────────────────────
 if st.session_state.step == 0:
     st.subheader("나만의 문화의날 유형 찾기")
     st.info(f"✨ {len(df):,}개 전국 문화시설 데이터 기반 추천! (16가지 문화 유형)")
@@ -269,6 +295,7 @@ if st.session_state.step == 0:
         st.session_state.step = 1
         st.rerun()
 
+# ── Step 1~10 ───────────────────────────
 elif 1 <= st.session_state.step <= 10:
     current_q = st.session_state.step - 1
     st.progress(st.session_state.step / 10)
@@ -300,6 +327,7 @@ elif 1 <= st.session_state.step <= 10:
         st.session_state.step += 1
         st.rerun()
 
+# ── Step 11 ─────────────────────────────
 elif st.session_state.step == 11:
     type_name, type_desc, cluster_info, my_code = get_culture_type(st.session_state.answers)
     user_info = st.session_state.user_info
@@ -385,13 +413,12 @@ elif st.session_state.step == 11:
                     )
                     st.caption(f"📍 {place['시도']} {place['시군구']} | {cluster_names.get(place['Cluster_K3'], '')}")
 
-                   raw_혜택 = str(place['혜택'])
+                    raw_혜택 = str(place['혜택'])
                     raw_혜택 = raw_혜택.replace('~~', '').replace('*', '')
                     if 'http' in raw_혜택 or 'www' in raw_혜택:
                         혜택_lines = [raw_혜택.strip()]
                     else:
                         혜택_lines = [line.strip() for line in raw_혜택.split('/') if line.strip()]
-                    
                     혜택_html = ''.join([f"<div>• {line}</div>" for line in 혜택_lines])
                     st.markdown(
                         f"<div>🎁 <strong>문화의날 혜택:</strong>{혜택_html}</div>",

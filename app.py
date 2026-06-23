@@ -66,6 +66,17 @@ def get_question_image(keyword):
     candidates = get_naver_images(keyword) + get_kakao_images(keyword)
     return candidates[:4]
 
+@st.cache_data
+def get_image_as_base64(url):
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            import base64
+            return "data:image/jpeg;base64," + base64.b64encode(response.content).decode()
+    except:
+        pass
+    return None
+
 SCORE_COL_MAP = {
     ("남성", "15-19세"):   "선호도_남성_15-19세",
     ("남성", "20대"):      "선호도_남성_20대",
@@ -338,9 +349,12 @@ elif 1 <= st.session_state.step <= 10:
     images, titles = [], []
     for val, opt in opt_items:
         img_candidates = get_question_image(opt['img_keyword'])
-        img = img_candidates[0] if img_candidates else "https://placehold.co/500x500"
-        if img.startswith("http://"):
-            img = img.replace("http://", "https://", 1)
+        img_url = img_candidates[0] if img_candidates else None
+        if img_url:
+            b64 = get_image_as_base64(img_url)
+            img = b64 if b64 else "https://placehold.co/500x500"
+        else:
+            img = "https://placehold.co/500x500"
         images.append(img)
         titles.append(opt['text'])
     clicked = clickable_images(

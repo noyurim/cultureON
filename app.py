@@ -6,8 +6,11 @@ import urllib.parse
 import requests
 import os
 from datetime import date, timedelta
-from my_keys import KAKAO_API_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
 from st_clickable_images import clickable_images
+
+KAKAO_API_KEY = st.secrets["KAKAO_API_KEY"]
+NAVER_CLIENT_ID = st.secrets["NAVER_CLIENT_ID"]
+NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
 
 st.set_page_config(page_title="문화ON", page_icon="🏛️", layout="centered")
 

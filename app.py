@@ -28,14 +28,17 @@ culture_day = get_culture_day()
 @st.cache_data
 def load_question_images():
     images = {}
-    base_url = "https://raw.githubusercontent.com/noyurim/cultureON/main/images"
     for q in range(1, 11):
         for i in range(2):
             key = f"q{q}_{i}"
-            images[key] = f"{base_url}/q{q}_{i}.jpg"
+            path = f"images/q{q}_{i}.jpg"
+            try:
+                with open(path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+                    images[key] = f"data:image/jpeg;base64,{b64}"
+            except FileNotFoundError:
+                images[key] = "https://placehold.co/500x500"
     return images
-question_images = load_question_images()
-
 # ==========================================
 # 선호도 컬럼 매핑
 # ==========================================

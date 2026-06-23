@@ -415,7 +415,7 @@ elif st.session_state.step == 11:
                         혜택_lines = [line.strip() for line in raw_혜택.split('/') if line.strip()]
                     혜택_html = ''.join([f"<div>• {line}</div>" for line in 혜택_lines])
                     st.markdown(
-                        f"<div>🎁 <strong>문화의날 혜택:</strong>{혜택_html}</div>",
+                        f"<div>🎁 <strong>문화의날 혜택:</strong>{혜택_html}</div><br>",
                         unsafe_allow_html=True
                     )
 

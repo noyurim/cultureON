@@ -86,7 +86,7 @@ SCORE_COL_MAP = {
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_csv('final_with_선호도.csv')
+        df = pd.read_csv('final_with_.csv')
 
         sido_map = {
             '서울': '서울특별시', '경기': '경기도', '인천': '인천광역시',

@@ -5,14 +5,12 @@ import calendar
 import urllib.parse
 import requests
 import os
+import base64
 from datetime import date, timedelta
 from st_clickable_images import clickable_images
 
-KAKAO_API_KEY = st.secrets["KAKAO_API_KEY"]
-NAVER_CLIENT_ID = st.secrets["NAVER_CLIENT_ID"]
-NAVER_CLIENT_SECRET = st.secrets["NAVER_CLIENT_SECRET"]
-
 st.set_page_config(page_title="문화ON", page_icon="🏛️", layout="centered")
+
 
 def get_culture_day():
     today = date.today()
@@ -24,59 +22,28 @@ def get_culture_day():
 
 culture_day = get_culture_day()
 
+# ==========================================
+# 로컬 이미지 → base64 변환 (캐싱)
+# ==========================================
 @st.cache_data
-def get_kakao_images(keyword):
-    try:
-        url = "https://dapi.kakao.com/v2/search/image"
-        headers = {"Authorization": f"KakaoAK {KAKAO_API_KEY}"}
-        params = {"query": keyword, "size": 10}
-        res = requests.get(url, headers=headers, params=params, timeout=4).json()
-        candidates = []
-        for doc in res.get('documents', []):
-            img_url = doc.get('image_url')
-            if doc.get('width', 0) >= 150 and doc.get('height', 0) >= 150 and img_url:
-                candidates.append(img_url)
-        return candidates
-    except:
-        return []
+def load_question_images():
+    images = {}
+    for q in range(1, 11):
+        for i in range(2):
+            path = f"images/q{q}_{i}.jpg"
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode()
+                    images[f"q{q}_{i}"] = f"data:image/jpeg;base64,{b64}"
+            else:
+                images[f"q{q}_{i}"] = "https://placehold.co/500x500"
+    return images
 
-@st.cache_data
-def get_naver_images(keyword):
-    try:
-        url = "https://openapi.naver.com/v1/search/image"
-        headers = {
-            "X-Naver-Client-Id": NAVER_CLIENT_ID,
-            "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
-        }
-        params = {"query": keyword, "display": 10}
-        res = requests.get(url, headers=headers, params=params, timeout=4).json()
-        candidates = []
-        for item in res.get('items', []):
-            img_url = item.get('link')
-            w = int(item.get('sizewidth', 0) or 0)
-            h = int(item.get('sizeheight', 0) or 0)
-            if img_url and (w == 0 or (w >= 150 and h >= 150)):
-                candidates.append(img_url)
-        return candidates
-    except:
-        return []
+question_images = load_question_images()
 
-@st.cache_data
-def get_question_image(keyword):
-    candidates = get_naver_images(keyword) + get_kakao_images(keyword)
-    return candidates[:4]
-
-@st.cache_data
-def get_image_as_base64(url):
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            import base64
-            return "data:image/jpeg;base64," + base64.b64encode(response.content).decode()
-    except:
-        pass
-    return None
-
+# ==========================================
+# 선호도 컬럼 매핑
+# ==========================================
 SCORE_COL_MAP = {
     ("남성", "15-19세"):   "선호도_남성_15-19세",
     ("남성", "20대"):      "선호도_남성_20대",
@@ -94,6 +61,9 @@ SCORE_COL_MAP = {
     ("여성", "70세 이상"): "선호도_여성_70세 이상",
 }
 
+# ==========================================
+# 데이터 로드
+# ==========================================
 @st.cache_data
 def load_data():
     try:
@@ -152,96 +122,57 @@ cluster_names = {
 }
 cluster_emoji = {0: "📚", 1: "🎬", 2: "🌿"}
 
-# ==========================================
-# TYPE_TABLE — main/sub 군집 구조
-# main: 메인 군집 (2개 추천)
-# sub: 서브 군집 (나머지 채우기)
-# ==========================================
 TYPE_TABLE = {
-    # 혼자 + 실내 + 가성비
     "0000": ("🎧 고요한 탐구자",      "혼자 실내에서 가성비 있게, 익숙한 곳을 즐기는 당신",      {"main": [0], "sub": [2]}),
     "0001": ("📚 사색하는 학자",      "혼자 실내에서 가성비 있게, 로컬 명소를 찾는 당신",       {"main": [0], "sub": [2]}),
-    # 혼자 + 실내 + 프리미엄
     "0010": ("🎨 감성 갤러리스트",    "혼자 실내에서 프리미엄하게, 유명한 곳을 즐기는 당신",     {"main": [2], "sub": [1]}),
     "0011": ("🖼️ 은밀한 미식가",     "혼자 실내에서 프리미엄하게, 숨겨진 곳을 찾는 당신",       {"main": [2], "sub": [0]}),
-    # 혼자 + 야외 + 가성비
     "0100": ("🌿 힐링 산책자",        "혼자 야외에서 가성비 있게, 익숙한 곳을 즐기는 당신",      {"main": [2], "sub": [0]}),
     "0101": ("🗺️ 로컬 탐험가",       "혼자 야외에서 가성비 있게, 로컬 명소를 찾는 당신",       {"main": [2], "sub": [0]}),
-    # 혼자 + 야외 + 프리미엄
     "0110": ("🌲 프리미엄 자연인",     "혼자 야외에서 프리미엄하게, 유명한 곳을 즐기는 당신",     {"main": [2], "sub": [1]}),
     "0111": ("🏕️ 비밀스러운 모험가",  "혼자 야외에서 프리미엄하게, 숨겨진 곳을 찾는 당신",       {"main": [2], "sub": [0]}),
-    # 함께 + 실내 + 가성비
     "1000": ("🏛️ 역사 탐방가",       "함께 실내에서 가성비 있게, 익숙한 곳을 즐기는 당신",      {"main": [2], "sub": [0]}),
     "1001": ("👨‍👩‍👧 따뜻한 동반자", "함께 실내에서 가성비 있게, 로컬 명소를 찾는 당신",       {"main": [2], "sub": [1]}),
-    # 함께 + 실내 + 프리미엄
     "1010": ("🌟 핫플 문화인",        "함께 실내에서 프리미엄하게, 유명한 곳을 즐기는 당신",     {"main": [1], "sub": [2]}),
     "1011": ("🎭 복합 문화 탐험가",    "함께 실내에서 프리미엄하게, 숨겨진 곳을 찾는 당신",       {"main": [2], "sub": [1]}),
-    # 함께 + 야외 + 가성비
     "1100": ("🎵 신나는 공연 메이트",  "함께 야외에서 가성비 있게, 익숙한 곳을 즐기는 당신",      {"main": [1], "sub": [2]}),
     "1101": ("🎪 로컬 액티비티러",     "함께 야외에서 가성비 있게, 로컬 명소를 찾는 당신",       {"main": [2], "sub": [1]}),
-    # 함께 + 야외 + 프리미엄
     "1110": ("🎊 활기찬 문화 리더",    "함께 야외에서 프리미엄하게, 유명한 곳을 즐기는 당신",     {"main": [1, 2], "sub": [0]}),
     "1111": ("🎉 만능 문화 탐험가",    "함께 야외에서 프리미엄하게, 숨겨진 곳까지 즐기는 당신",   {"main": [1, 2], "sub": [0]}),
 }
 
 questions = [
-    {"title": "오늘은 누구와?", "axis": "C",
-     "options": {
-         "0": {"text": "혼자서 조용히 🎧", "img_keyword": "혼자 책 카페"},
-         "1": {"text": "친구/가족과 함께 🎉", "img_keyword": "친구들 모임"}
-     }},
-    {"title": "어떤 공간이 편해?", "axis": "A",
-     "options": {
-         "0": {"text": "실내가 좋아 🏛️", "img_keyword": "미술관"},
-         "1": {"text": "야외가 좋아 🌿", "img_keyword": "공원 잔디밭"}
-     }},
-    {"title": "비용은?", "axis": "B",
-     "options": {
-         "0": {"text": "무료/할인 위주 💚", "img_keyword": "공공 도서관"},
-         "1": {"text": "가격 상관없이 특별하게 ✨", "img_keyword": "갤러리 작품"}
-     }},
-    {"title": "어떤 경험을 원해?", "axis": "A",
-     "options": {
-         "0": {"text": "보고 감상하는 🎨", "img_keyword": "그림 전시"},
-         "1": {"text": "몸으로 체험하는 🎢", "img_keyword": "체험관 놀이"}
-     }},
-    {"title": "장소 스타일은?", "axis": "D",
-     "options": {
-         "0": {"text": "유명한 핫플 🏆", "img_keyword": "서울 랜드마크"},
-         "1": {"text": "숨겨진 로컬 명소 🗺️", "img_keyword": "골목 카페거리"}
-     }},
-    {"title": "이동 거리는?", "axis": "D",
-     "options": {
-         "0": {"text": "가까운 곳이 좋아 🚶", "img_keyword": "동네 거리"},
-         "1": {"text": "멀어도 특별한 곳 🚗", "img_keyword": "자동차 여행"}
-     }},
-    {"title": "선호하는 시간대는?", "axis": "C",
-     "options": {
-         "0": {"text": "낮에 여유롭게 ☀️", "img_keyword": "맑은 하늘 공원"},
-         "1": {"text": "저녁에 감성적으로 🌙", "img_keyword": "도시 야경"}
-     }},
-    {"title": "문화생활 스타일은?", "axis": "C",
-     "options": {
-         "0": {"text": "조용히 집중해서 🎯", "img_keyword": "도서관 열람실"},
-         "1": {"text": "활기차게 즐기면서 🎊", "img_keyword": "거리 축제"}
-     }},
-    {"title": "관심 있는 분야는?", "axis": "B",
-     "options": {
-         "0": {"text": "역사·예술·전통 🏺", "img_keyword": "한옥 마을"},
-         "1": {"text": "트렌드·현대·팝컬처 🎬", "img_keyword": "팝업스토어"}
-     }},
-    {"title": "오늘 하루 마무리는?", "axis": "B",
-     "options": {
-         "0": {"text": "조용히 여운을 즐기며 🍵", "img_keyword": "찻집 다도"},
-         "1": {"text": "맛집이나 카페로 마무리 ☕", "img_keyword": "디저트 카페"}
-     }},
+    {"title": "오늘은 누구와?",
+     "options": {"0": "혼자서 조용히 🎧", "1": "친구/가족과 함께 🎉"},
+     "axis": "C"},
+    {"title": "어떤 공간이 편해?",
+     "options": {"0": "실내가 좋아 🏛️", "1": "야외가 좋아 🌿"},
+     "axis": "A"},
+    {"title": "비용은?",
+     "options": {"0": "무료/할인 위주 💚", "1": "가격 상관없이 특별하게 ✨"},
+     "axis": "B"},
+    {"title": "어떤 경험을 원해?",
+     "options": {"0": "보고 감상하는 🎨", "1": "몸으로 체험하는 🎢"},
+     "axis": "A"},
+    {"title": "장소 스타일은?",
+     "options": {"0": "유명한 핫플 🏆", "1": "숨겨진 로컬 명소 🗺️"},
+     "axis": "D"},
+    {"title": "이동 거리는?",
+     "options": {"0": "가까운 곳이 좋아 🚶", "1": "멀어도 특별한 곳 🚗"},
+     "axis": "D"},
+    {"title": "선호하는 시간대는?",
+     "options": {"0": "낮에 여유롭게 ☀️", "1": "저녁에 감성적으로 🌙"},
+     "axis": "C"},
+    {"title": "문화생활 스타일은?",
+     "options": {"0": "조용히 집중해서 🎯", "1": "활기차게 즐기면서 🎊"},
+     "axis": "C"},
+    {"title": "관심 있는 분야는?",
+     "options": {"0": "역사·예술·전통 🏺", "1": "트렌드·현대·팝컬처 🎬"},
+     "axis": "B"},
+    {"title": "오늘 하루 마무리는?",
+     "options": {"0": "조용히 여운을 즐기며 🍵", "1": "맛집이나 카페로 마무리 ☕"},
+     "axis": "B"},
 ]
-
-@st.cache_data
-def preload_all_images():
-    for q in questions:
-        for opt in q['options'].values():
-            get_question_image(opt['img_keyword'])
 
 @st.cache_data
 def preload_character_images():
@@ -254,7 +185,6 @@ def preload_character_images():
                     image_bytes[code] = f.read()
     return image_bytes
 
-preload_all_images()
 character_images = preload_character_images()
 
 if 'step' not in st.session_state:
@@ -345,18 +275,14 @@ elif 1 <= st.session_state.step <= 10:
     st.progress(st.session_state.step / 10)
     st.caption(f"Q{st.session_state.step} / 10")
     st.markdown(f"### {questions[current_q]['title']}")
+
     opt_items = list(questions[current_q]['options'].items())
-    images, titles = [], []
-    for val, opt in opt_items:
-        img_candidates = get_question_image(opt['img_keyword'])
-        img_url = img_candidates[0] if img_candidates else None
-        if img_url:
-            b64 = get_image_as_base64(img_url)
-            img = b64 if b64 else "https://placehold.co/500x500"
-        else:
-            img = "https://placehold.co/500x500"
-        images.append(img)
-        titles.append(opt['text'])
+    images = [
+        question_images.get(f"q{current_q+1}_0", "https://placehold.co/500x500"),
+        question_images.get(f"q{current_q+1}_1", "https://placehold.co/500x500"),
+    ]
+    titles = [opt for _, opt in opt_items]
+
     clicked = clickable_images(
         images, titles=titles,
         div_style={"display": "flex", "justify-content": "center", "gap": "20px"},
@@ -403,7 +329,6 @@ elif st.session_state.step == 11:
     st.markdown("<br>", unsafe_allow_html=True)
 
     if not df.empty:
-        # 지역 필터링
         if sigungu != "전체":
             local = df[df['시군구'] == sigungu].copy()
         else:
@@ -413,15 +338,12 @@ elif st.session_state.step == 11:
         used_categories = set()
         final = []
 
-        # 1차: 메인 군집에서 2개 (카테고리별 1개씩)
         main_pool = local[local['Cluster_K3'].isin(main_clusters)]
         final += pick_by_category(main_pool, 2, used_places, used_categories, score_col)
 
-        # 2차: 서브 군집에서 나머지 채우기
         sub_pool = local[local['Cluster_K3'].isin(sub_clusters)]
         final += pick_by_category(sub_pool, 4 - len(final), used_places, used_categories, score_col)
 
-        # 3차: 부족하면 시/도 전체로 확장
         if len(final) < 4:
             sido_df = df[df['시도'] == sido].copy()
             main_sido = sido_df[sido_df['Cluster_K3'].isin(main_clusters)]
@@ -429,7 +351,6 @@ elif st.session_state.step == 11:
             final += pick_by_category(main_sido, 4 - len(final), used_places, used_categories, score_col)
             final += pick_by_category(sub_sido, 4 - len(final), used_places, used_categories, score_col)
 
-        # 4차: 그래도 부족하면 카테고리 무시하고 보충
         if len(final) < 4:
             all_pool = local.copy()
             if score_col and score_col in all_pool.columns:
@@ -466,6 +387,8 @@ elif st.session_state.step == 11:
                     st.caption(f"📍 {place['시도']} {place['시군구']} | {cluster_names.get(place['Cluster_K3'], '')}")
 
                     raw_혜택 = str(place['혜택'])
+                    # 마크다운 특수문자 이스케이프
+                    raw_혜택 = raw_혜택.replace('~~', '').replace('*', '').replace('_', ' ')
                     if 'http' in raw_혜택 or 'www' in raw_혜택:
                         혜택_text = f"• {raw_혜택.strip()}"
                     else:

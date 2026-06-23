@@ -184,6 +184,7 @@ def preload_character_images():
     return image_bytes
 
 character_images = preload_character_images()
+question_images = load_question_images()
 
 if 'step' not in st.session_state:
     st.session_state.step = 0

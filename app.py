@@ -30,13 +30,18 @@ def load_question_images():
     images = {}
     for q in range(1, 11):
         for i in range(2):
-            path = f"images/q{q}_{i}.jpg"
-            if os.path.exists(path):
-                with open(path, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode()
-                    images[f"q{q}_{i}"] = f"data:image/jpeg;base64,{b64}"
-            else:
-                images[f"q{q}_{i}"] = "https://placehold.co/500x500"
+            key = f"q{q}_{i}"
+            # 여러 경로 시도
+            for path in [f"images/q{q}_{i}.jpg", f"./images/q{q}_{i}.jpg"]:
+                try:
+                    with open(path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode()
+                        images[key] = f"data:image/jpeg;base64,{b64}"
+                        break
+                except FileNotFoundError:
+                    continue
+            if key not in images:
+                images[key] = "https://placehold.co/500x500"
     return images
 
 question_images = load_question_images()

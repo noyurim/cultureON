@@ -385,15 +385,18 @@ elif st.session_state.step == 11:
                     )
                     st.caption(f"📍 {place['시도']} {place['시군구']} | {cluster_names.get(place['Cluster_K3'], '')}")
 
-                    raw_혜택 = str(place['혜택'])
-                    # 마크다운 특수문자 이스케이프
-                    raw_혜택 = raw_혜택.replace('~~', '').replace('*', '').replace('_', ' ')
+                   raw_혜택 = str(place['혜택'])
+                    raw_혜택 = raw_혜택.replace('~~', '').replace('*', '')
                     if 'http' in raw_혜택 or 'www' in raw_혜택:
-                        혜택_text = f"• {raw_혜택.strip()}"
+                        혜택_lines = [raw_혜택.strip()]
                     else:
-                        혜택_lines = raw_혜택.split('/')
-                        혜택_text = '<br>'.join([f"• {line.strip()}" for line in 혜택_lines if line.strip()])
-                    st.markdown(f"🎁 **문화의날 혜택:**<br>{혜택_text}", unsafe_allow_html=True)
+                        혜택_lines = [line.strip() for line in raw_혜택.split('/') if line.strip()]
+                    
+                    혜택_html = ''.join([f"<div>• {line}</div>" for line in 혜택_lines])
+                    st.markdown(
+                        f"<div>🎁 <strong>문화의날 혜택:</strong>{혜택_html}</div>",
+                        unsafe_allow_html=True
+                    )
 
                     period = safe_get(place, '기간')
                     if period:

@@ -303,29 +303,23 @@ elif 1 <= st.session_state.step <= 10:
     st.markdown(f"### {questions[current_q]['title']}")
 
     opt_items = list(questions[current_q]['options'].items())
-    images = [
-        question_images.get(f"q{current_q+1}_0", "https://placehold.co/500x500"),
-        question_images.get(f"q{current_q+1}_1", "https://placehold.co/500x500"),
-    ]
-    titles = [opt for _, opt in opt_items]
-
-    clicked = clickable_images(
-        images, titles=titles,
-        div_style={"display": "flex", "justify-content": "center", "gap": "20px"},
-        img_style={"width": "300px", "height": "300px", "object-fit": "cover", "border-radius": "14px"},
-        key=f"img_{st.session_state.step}"
-    )
-
     col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"<div style='text-align:center;font-weight:600'>{titles[0]}</div>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<div style='text-align:center;font-weight:600'>{titles[1]}</div>", unsafe_allow_html=True)
 
-    if clicked > -1:
-        st.session_state.answers.append(opt_items[clicked][0])
-        st.session_state.step += 1
-        st.rerun()
+    with col1:
+        img0 = question_images.get(f"q{current_q+1}_0", "https://placehold.co/500x500")
+        st.image(img0, use_container_width=True)
+        if st.button(opt_items[0][1], use_container_width=True, key=f"btn_{current_q}_0"):
+            st.session_state.answers.append(opt_items[0][0])
+            st.session_state.step += 1
+            st.rerun()
+
+    with col2:
+        img1 = question_images.get(f"q{current_q+1}_1", "https://placehold.co/500x500")
+        st.image(img1, use_container_width=True)
+        if st.button(opt_items[1][1], use_container_width=True, key=f"btn_{current_q}_1"):
+            st.session_state.answers.append(opt_items[1][0])
+            st.session_state.step += 1
+            st.rerun()
 
 # ── Step 11 ─────────────────────────────
 elif st.session_state.step == 11:

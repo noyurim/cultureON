@@ -383,6 +383,8 @@ elif st.session_state.step == 11:
                 if len(final) >= 4:
                     break
 
+        final = final[:4]  # 최대 4개 보장
+
         mixed = len(final) > 0 and any(
             (sigungu != "전체" and p.get('시군구') != sigungu) or
             (sigungu == "전체" and p.get('시도') != sido)
